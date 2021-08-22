@@ -99,6 +99,7 @@ mod rs_raytracer {
             let mut rng = rand::thread_rng();
             let pitch = (IMAGE_WIDTH * 3) as usize;
             for y in 0..(IMAGE_HEIGHT as usize) {
+                print!("Rendering line {}/{}...", y+1, IMAGE_HEIGHT);
                 for x in 0..(IMAGE_WIDTH as usize) {
                     let offset = y * pitch + x * 3;
 
@@ -107,6 +108,7 @@ mod rs_raytracer {
                     self.pixels[offset + 1] = rand_val;
                     self.pixels[offset + 2] = rand_val;
                 }
+                println!("done!");
             }
 
             let end_time = std::time::Instant::now();
