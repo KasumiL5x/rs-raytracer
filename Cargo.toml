@@ -1,0 +1,16 @@
+[package]
+name = "rs-raytracer"
+authors = ["Daniel Green <KasumiL5x@gmail.com>"]
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.4"
+
+[dependencies.sdl2]
+version = "0.34.5"
+default-features = true
+# Includes a full SDL build including necessary libs and DLLs on the machine.
+features = ["bundled"]
