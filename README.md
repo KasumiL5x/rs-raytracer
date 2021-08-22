@@ -6,5 +6,7 @@ The ray tracer is implemented as a standalone module that can write to a file or
 An SDL window handles the display and keystrokes for running the ray tracer and saving the image.
 
 `Escape`: Quit.
+
 `Space`: Run the ray tracer and update the preview with its result.
+
 `S`: Save the current ray tracer buffer to a PPM file. This is local to your terminal CWD or exe if run directly.
