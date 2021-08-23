@@ -1,5 +1,3 @@
-use rand::Rng;
-
 use std::io;
 use std::io::prelude::*;
 use std::io::BufWriter;
@@ -13,23 +11,21 @@ pub const IMAGE_HEIGHT: u32 = 720;
 pub const PPM_OUT: &str = "./out.ppm";
 
 pub struct RSRaytracer {
-    //? NOTE: This may change to be an array of f32 at a later time, so the SDL texture copy would require a
-    //?       conversion to 0..255. Note that the f32 may go beyond 1, so clipping would still be required.
-    pixels: Box<[u32]>
+    pixels: Box<[f32]>
 }
 
 impl RSRaytracer {
     pub fn new() -> RSRaytracer {
-        let mut pixels = vec![255; (IMAGE_WIDTH * IMAGE_HEIGHT * 3) as usize];
+        let mut pixels = vec![1.0; (IMAGE_WIDTH * IMAGE_HEIGHT * 3) as usize];
 
-        // Start with a gradient texture.
+        // Start with a simple gradient.
         for y in 0..(IMAGE_HEIGHT as usize) {
             for x in 0..(IMAGE_WIDTH as usize) {
                 let pitch = (IMAGE_WIDTH * 3) as usize;
                 let offset = y * pitch + x * 3;
-                pixels[offset + 0] = (((x as f32) / (IMAGE_WIDTH as f32)) * 255.0) as u32;
-                pixels[offset + 1] = (((y as f32) / (IMAGE_HEIGHT as f32)) * 255.0) as u32;
-                pixels[offset + 2] = 0;
+                pixels[offset + 0] = (x as f32) / (IMAGE_WIDTH as f32);
+                pixels[offset + 1] = (y as f32) / (IMAGE_HEIGHT as f32);
+                pixels[offset + 2] = 0.0;
             }
         }
 
@@ -52,14 +48,19 @@ impl RSRaytracer {
                 for x in 0..(IMAGE_WIDTH as usize) {
                     let offset = y * pitch + x * 3;
 
-                    let r = self.pixels[offset + 0];
-                    buffer[offset + 0] = if r > u8::MAX.into() {u8::MAX} else {r as u8};
+                    // TODO: Proper mapping rather than just a clamp.
 
-                    let g = self.pixels[offset + 1];
-                    buffer[offset + 1] = if g > u8::MAX.into() {u8::MAX} else {g as u8};
+                    let r_pixel = self.pixels[offset + 0];
+                    let r_value = (r_pixel * 255.0) as u8;
+                    buffer[offset + 0] = if r_value > u8::MAX {u8::MAX} else {r_value};
 
-                    let b = self.pixels[offset + 2];
-                    buffer[offset + 2] = if b > u8::MAX.into() {u8::MAX} else {b as u8};
+                    let g_pixel = self.pixels[offset + 1];
+                    let g_value = (g_pixel * 255.0) as u8;
+                    buffer[offset + 1] = if g_value > u8::MAX {u8::MAX} else {g_value};
+
+                    let b_pixel = self.pixels[offset + 2];
+                    let b_value = (b_pixel * 255.0) as u8;
+                    buffer[offset + 2] = if b_value > u8::MAX {u8::MAX} else {b_value};
                 }
             }
         }).unwrap();
@@ -90,9 +91,8 @@ impl RSRaytracer {
 
 
         // TODO: Ray tracing code.
-        let mut rng = rand::thread_rng();
         let pitch = (IMAGE_WIDTH * 3) as usize;
-        for y in 0..(IMAGE_HEIGHT as usize) {
+        for y in (0..(IMAGE_HEIGHT as usize)).rev() {
             print!("Rendering line {}/{}...", y+1, IMAGE_HEIGHT);
             for x in 0..(IMAGE_WIDTH as usize) {
                 let offset = y * pitch + x * 3;
@@ -102,14 +102,9 @@ impl RSRaytracer {
                 let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical - origin);
                 let col = self.ray_color(&r);
 
-                self.pixels[offset + 0] = (col.x * 255.0) as u32;
-                self.pixels[offset + 1] = (col.y * 255.0) as u32;
-                self.pixels[offset + 2] = (col.z * 255.0) as u32;
-
-                // let rand_val: u32 = rng.gen::<u8>() as u32;
-                // self.pixels[offset + 0] = rand_val;
-                // self.pixels[offset + 1] = rand_val;
-                // self.pixels[offset + 2] = rand_val;
+                self.pixels[offset + 0] = col.x;
+                self.pixels[offset + 1] = col.y;
+                self.pixels[offset + 2] = col.z;
             }
             println!("done!");
         }
@@ -141,9 +136,12 @@ impl RSRaytracer {
             for y in 0..(IMAGE_HEIGHT as usize) {
                 for x in 0..(IMAGE_WIDTH as usize) {
                     let offset = y * pitch + x * 3;
-                    let r = self.pixels[offset + 0];
-                    let g = self.pixels[offset + 1];
-                    let b = self.pixels[offset + 2];
+
+                    // TODO: Proper mapping rather than just a clamp.
+
+                    let r = (self.pixels[offset + 0] * 255.0) as u8;
+                    let g = (self.pixels[offset + 1] * 255.0) as u8;
+                    let b = (self.pixels[offset + 2] * 255.0) as u8;
 
                     write!(writer, "{} {} {}\n", r, g, b)?;
                 }
