@@ -165,6 +165,62 @@ impl Ray {
   }
 }
 
+// --------------------------------------------------
+// Hittable / Geometric Objects
+// --------------------------------------------------
+pub struct HitRecord {
+  pub p: Vec3,
+  pub n: Vec3,
+  pub t: f32
+}
+trait Hittable {
+  fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, out_hit: &mut HitRecord) -> bool;
+}
+
+pub struct Sphere {
+  pub center: Vec3,
+  pub radius: f32
+}
+
+impl Sphere {
+  pub fn new(center: Vec3, radius: f32) -> Sphere {
+    Sphere {
+      center: center,
+      radius: radius
+    }
+  }
+}
+
+impl Hittable for Sphere {
+  fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, out_hit: &mut HitRecord) -> bool {
+    let oc = ray.origin - self.center;
+    let a = ray.direction.sqr_length();
+    let half_b = oc.dot(&ray.direction);
+    let c = oc.sqr_length() - (self.radius * self.radius);
+
+    let discriminant = (half_b * half_b) - (a * c);
+    if discriminant < 0.0 {
+      return false
+    }
+    let sqrtd = discriminant.sqrt();
+
+    // Find the nearest root that lies in the acceptable range.
+    let mut root = (-half_b - sqrtd) / a;
+    if root < t_min || t_max < root {
+      root = (-half_b + sqrtd) / a;
+      if root < t_min || t_max < root {
+        return false
+      }
+    }
+
+    out_hit.t = root;
+    out_hit.p = ray.at(out_hit.t);
+    out_hit.n = (out_hit.p - self.center) / self.radius;
+
+    return true
+  }
+}
+
 
 // --------------------------------------------------
 // Intersections
