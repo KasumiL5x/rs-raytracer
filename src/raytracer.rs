@@ -115,6 +115,10 @@ impl RSRaytracer {
     }
 
     fn ray_color(&self, ray: &Ray) -> Vec3 {
+        if hit_sphere(&Vec3::new(0.0, 0.0, -1.0), 0.5, ray) {
+            return Vec3::new(1.0, 0.0, 0.0)
+        }
+
         let direction = ray.direction.normalized();
         let t = 0.5 * (direction.y + 1.0);
         (1.0-t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
