@@ -92,13 +92,13 @@ impl RSRaytracer {
 
         // TODO: Ray tracing code.
         let pitch = (IMAGE_WIDTH * 3) as usize;
-        for y in (0..(IMAGE_HEIGHT as usize)).rev() {
+        for y in 0..(IMAGE_HEIGHT as usize) {
             print!("Rendering line {}/{}...", y+1, IMAGE_HEIGHT);
             for x in 0..(IMAGE_WIDTH as usize) {
                 let offset = y * pitch + x * 3;
 
                 let u = (x as f32) / ((IMAGE_WIDTH-1) as f32);
-                let v = (y as f32) / ((IMAGE_HEIGHT-1) as f32);
+                let v = 1.0 - ((y as f32) / ((IMAGE_HEIGHT-1) as f32));
                 let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical - origin);
                 let col = self.ray_color(&r);
 
