@@ -1,5 +1,8 @@
 use std::ops;
 
+// --------------------------------------------------
+// Vec3
+// --------------------------------------------------
 #[derive(Clone, Copy, Debug)]
 pub struct Vec3 {
   pub x: f32,
@@ -135,5 +138,22 @@ impl ops::Neg for Vec3 {
       y: -self.y,
       z: -self.z
     }
+  }
+}
+
+
+
+// --------------------------------------------------
+// Ray
+// --------------------------------------------------
+#[derive(Clone, Copy, Debug)]
+pub struct Ray {
+  pub origin: Vec3,
+  pub direction: Vec3
+}
+
+impl Ray {
+  pub fn at(&self, t: f32) -> Vec3 {
+    self.origin + self.direction * t
   }
 }
