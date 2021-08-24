@@ -5,8 +5,9 @@ use std::fs::File;
 
 use crate::math::*;
 
-pub const IMAGE_WIDTH: u32 = 1280;
-pub const IMAGE_HEIGHT: u32 = 720;
+pub const WIDTH: u32 = 1280;
+pub const HEIGHT: u32 = 720;
+pub const CHANNELS: u32 = 3;
 
 pub const PPM_OUT: &str = "./out.ppm";
 
@@ -17,15 +18,15 @@ pub struct RSRaytracer {
 
 impl RSRaytracer {
     pub fn new() -> RSRaytracer {
-        let mut pixels = vec![1.0; (IMAGE_WIDTH * IMAGE_HEIGHT * 3) as usize];
+        let mut pixels = vec![1.0; (WIDTH * HEIGHT * CHANNELS) as usize];
 
         // Start with a simple gradient.
-        for y in 0..(IMAGE_HEIGHT as usize) {
-            for x in 0..(IMAGE_WIDTH as usize) {
-                let pitch = (IMAGE_WIDTH * 3) as usize;
-                let offset = y * pitch + x * 3;
-                pixels[offset + 0] = (x as f32) / (IMAGE_WIDTH as f32);
-                pixels[offset + 1] = (y as f32) / (IMAGE_HEIGHT as f32);
+        for y in 0..HEIGHT {
+            for x in 0..WIDTH {
+                let pitch = WIDTH * CHANNELS;
+                let offset = (y * pitch + x * CHANNELS) as usize;
+                pixels[offset + 0] = (x as f32) / (WIDTH as f32);
+                pixels[offset + 1] = (y as f32) / (HEIGHT as f32);
                 pixels[offset + 2] = 0.0;
             }
         }
@@ -63,16 +64,16 @@ impl RSRaytracer {
     pub fn copy_to(&self, texture: &mut sdl2::render::Texture) {
         // Safety check before copying.
         let query = texture.query();
-        if (query.width != IMAGE_WIDTH) || (query.height != IMAGE_HEIGHT) {
+        if (query.width != WIDTH) || (query.height != HEIGHT) {
             println!("Texture dimensions do not match internal dimensions. Ignoring copy request.");
             return
         }
 
         // Manual copy per pixel.
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            for y in 0..(IMAGE_HEIGHT as usize) {
-                for x in 0..(IMAGE_WIDTH as usize) {
-                    let offset = y * pitch + x * 3;
+            for y in 0..HEIGHT {
+                for x in 0..WIDTH {
+                    let offset = (y * (pitch as u32) + x * CHANNELS) as usize;
 
                     // TODO: Proper mapping rather than just a clamp.
 
@@ -95,7 +96,7 @@ impl RSRaytracer {
         // texture.update(
         //     sdl2::rect::Rect::new(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT),
         //     &self.pixels,
-        //     (IMAGE_WIDTH * 3) as usize
+        //     (IMAGE_WIDTH * CHANNELS) as usize
         // ).unwrap();
     }
 
@@ -104,7 +105,7 @@ impl RSRaytracer {
         let start_time = std::time::Instant::now();
 
         // Image details.
-        let aspect_ratio = (IMAGE_WIDTH as f32) / (IMAGE_HEIGHT as f32);
+        let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
         // Camera details.
         let viewport_height = 2.0; // Why 2?
         let viewport_width = aspect_ratio * viewport_height;
@@ -115,14 +116,14 @@ impl RSRaytracer {
         let vertical = Vec3::new(0.0, viewport_height, 0.0);
         let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - Vec3::new(0.0, 0.0, focal_length);
 
-        let pitch = (IMAGE_WIDTH * 3) as usize;
-        for y in 0..(IMAGE_HEIGHT as usize) {
-            print!("Rendering line {}/{}...", y+1, IMAGE_HEIGHT);
-            for x in 0..(IMAGE_WIDTH as usize) {
-                let offset = y * pitch + x * 3;
+        let pitch = WIDTH * CHANNELS;
+        for y in 0..HEIGHT {
+            print!("Rendering line {}/{}...", y+1, HEIGHT);
+            for x in 0..WIDTH {
+                let offset = (y * pitch + x * CHANNELS) as usize;
 
-                let u = (x as f32) / ((IMAGE_WIDTH-1) as f32);
-                let v = 1.0 - ((y as f32) / ((IMAGE_HEIGHT-1) as f32));
+                let u = (x as f32) / ((WIDTH-1) as f32);
+                let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
                 let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical - origin);
                 let col = self.ray_color(&r);
 
@@ -158,13 +159,13 @@ impl RSRaytracer {
             // P3
             // WIDTH HEIGHT
             // MAX_VALUE
-            write!(writer, "P3\n{} {}\n255\n", IMAGE_WIDTH, IMAGE_HEIGHT)?;
+            write!(writer, "P3\n{} {}\n255\n", WIDTH, HEIGHT)?;
 
             // Pixels (in rows, left to right, top to bottom).
-            let pitch = (IMAGE_WIDTH * 3) as usize;
-            for y in 0..(IMAGE_HEIGHT as usize) {
-                for x in 0..(IMAGE_WIDTH as usize) {
-                    let offset = y * pitch + x * 3;
+            let pitch = WIDTH * CHANNELS;
+            for y in 0..HEIGHT {
+                for x in 0..WIDTH {
+                    let offset = (y * pitch + x * CHANNELS) as usize;
 
                     // TODO: Proper mapping rather than just a clamp.
 

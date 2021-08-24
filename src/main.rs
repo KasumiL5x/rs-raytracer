@@ -21,8 +21,8 @@ pub mod math;
 pub mod raytracer;
 
 pub fn main() -> Result<(), String> {
-    let window_width = raytracer::IMAGE_WIDTH;
-    let window_height = raytracer::IMAGE_HEIGHT;
+    let window_width = raytracer::WIDTH;
+    let window_height = raytracer::HEIGHT;
 
     // Setup SDL and create the video subsystem.
     let sdl_context = sdl2::init()?;
