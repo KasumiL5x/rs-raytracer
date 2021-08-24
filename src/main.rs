@@ -60,6 +60,14 @@ pub fn main() -> Result<(), String> {
     // Create the ray tracer instance.
     let mut ray_tracer = raytracer::RSRaytracer::new();
 
+    // Setup the scene.
+    ray_tracer.add_sphere(
+        math::Sphere::new(math::Vec3::new(0.0, 0.0, -1.0), 0.5)
+    );
+    ray_tracer.add_sphere(
+        math::Sphere::new(math::Vec3::new(0.0, -100.5, -1.0), 100.0)
+    );
+
     // Copy the initial raytracer texture over and display it.
     ray_tracer.copy_to(&mut texture);
     copy_texture_to_canvas(&texture, &mut canvas, window_width, window_height);

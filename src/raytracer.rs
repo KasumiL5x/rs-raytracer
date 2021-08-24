@@ -11,7 +11,8 @@ pub const IMAGE_HEIGHT: u32 = 720;
 pub const PPM_OUT: &str = "./out.ppm";
 
 pub struct RSRaytracer {
-    pixels: Box<[f32]>
+    pixels: Box<[f32]>,
+    objects: Vec<Box<dyn Hittable>>
 }
 
 impl RSRaytracer {
@@ -29,9 +30,34 @@ impl RSRaytracer {
             }
         }
 
+        // No objects.
+        let empty_objects:  Vec<Box<dyn Hittable>> = Vec::new();
+
         RSRaytracer {
-            pixels: pixels.into_boxed_slice()
+            pixels: pixels.into_boxed_slice(),
+            objects: empty_objects
         }
+    }
+
+    pub fn add_sphere(&mut self, sphere: Sphere) {
+        let boxed_obj = Box::new(sphere);
+        self.objects.push(boxed_obj)
+    }
+
+    fn hit_objects(&self, ray: &Ray, t_min: f32, t_max: f32, out_hit: &mut HitRecord) -> bool {
+        let mut tmp_rec: HitRecord = HitRecord::new();
+        let mut hit_anything = false;
+        let mut closest_so_far = t_max;
+
+        for obj in self.objects.as_slice() {
+            if obj.hit(ray, t_min, closest_so_far, &mut tmp_rec) {
+                hit_anything = true;
+                closest_so_far = tmp_rec.t;
+                *out_hit = tmp_rec;
+            }
+        }
+
+        return hit_anything
     }
 
     pub fn copy_to(&self, texture: &mut sdl2::render::Texture) {
@@ -89,8 +115,6 @@ impl RSRaytracer {
         let vertical = Vec3::new(0.0, viewport_height, 0.0);
         let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - Vec3::new(0.0, 0.0, focal_length);
 
-
-        // TODO: Ray tracing code.
         let pitch = (IMAGE_WIDTH * 3) as usize;
         for y in 0..(IMAGE_HEIGHT as usize) {
             print!("Rendering line {}/{}...", y+1, IMAGE_HEIGHT);
@@ -115,10 +139,9 @@ impl RSRaytracer {
     }
 
     fn ray_color(&self, ray: &Ray) -> Vec3 {
-        let t = hit_sphere(&Vec3::new(0.0, 0.0, -1.0), 0.5, ray);
-        if t > 0.0 {
-            let nrm = (ray.at(t) - Vec3::new(0.0, 0.0, -1.0)).normalized();
-            return Vec3::new(nrm.x + 1.0, nrm.y + 1.0, nrm.z + 1.0) * 0.5
+        let mut hit_rec = HitRecord::new();
+        if self.hit_objects(ray, 0.0, f32::MAX, &mut hit_rec) {
+            return 0.5 * (hit_rec.n + Vec3::new(1.0, 1.0, 1.0))
         }
 
         let direction = ray.direction.normalized();

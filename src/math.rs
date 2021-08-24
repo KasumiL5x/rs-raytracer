@@ -170,6 +170,7 @@ impl Ray {
 // --------------------------------------------------
 // Hittable / Geometric Objects
 // --------------------------------------------------
+#[derive(Clone, Copy, Debug)]
 pub struct HitRecord {
     pub p: Vec3,
     pub n: Vec3,
@@ -178,13 +179,21 @@ pub struct HitRecord {
 }
 
 impl HitRecord {
+    pub fn new() -> HitRecord {
+        HitRecord{
+            p: Vec3::new(0.0, 0.0, 0.0),
+            n: Vec3::new(0.0, 0.0, 0.0),
+            t: 0.0,
+            front_face: false
+        }
+    }
     pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: &Vec3) {
         self.front_face = ray.direction.dot(outward_normal) < 0.0;
         self.n = if self.front_face {*outward_normal} else {-*outward_normal};
     }
 }
 
-trait Hittable {
+pub trait Hittable {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32, out_hit: &mut HitRecord) -> bool;
 }
 
