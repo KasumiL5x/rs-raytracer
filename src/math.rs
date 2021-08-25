@@ -1,5 +1,7 @@
 use std::ops;
 
+use rand::prelude::*;
+
 // --------------------------------------------------
 // Vec3
 // --------------------------------------------------
@@ -20,6 +22,15 @@ impl Vec3 {
             x: 0.0,
             y: 0.0,
             z: 0.0,
+        }
+    }
+
+    pub fn random() -> Vec3 {
+        let mut rng = SmallRng::from_entropy();
+        Vec3 {
+            x: rng.gen(),
+            y: rng.gen(),
+            z: rng.gen()
         }
     }
 
@@ -268,4 +279,16 @@ pub fn hit_sphere(center: &Vec3, radius: f32, ray: &Ray) -> f32 {
     } else {
         return (-half_b - discriminant.sqrt()) / a;
     }
+}
+
+// --------------------------------------------------
+// Other
+// --------------------------------------------------
+pub fn random_on_sphere() -> Vec3 {
+    let mut rng = SmallRng::from_entropy();
+    Vec3::new(
+        rng.gen::<f32>() - 0.5,
+        rng.gen::<f32>() - 0.5,
+        rng.gen::<f32>() - 0.5
+    ).normalize()
 }

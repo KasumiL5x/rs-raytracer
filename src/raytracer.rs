@@ -13,7 +13,10 @@ use crate::math::*;
 pub const WIDTH: u32 = 1280;
 pub const HEIGHT: u32 = 720;
 pub const CHANNELS: u32 = 3;
-const SAMPLES_PER_PIXEL: u32 = 20;
+
+const SAMPLES_PER_PIXEL: u32 = 20; // 100
+const MAX_DEPTH: u32 = 20; // 50
+
 
 pub const PPM_OUT: &str = "./out.ppm";
 
@@ -136,7 +139,7 @@ impl RSRaytracer {
                     let v = ((y as f32) + r1) / ((HEIGHT-1) as f32);
 
                     let r = self.cam.get_ray(u, 1.0 - v);
-                    pixel_color += self.ray_color(&r);
+                    pixel_color += self.ray_color(&r, MAX_DEPTH);
                 }
                 // let u = (x as f32) / ((WIDTH-1) as f32);
                 // let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
@@ -155,10 +158,20 @@ impl RSRaytracer {
         println!("Ray trace complete in {:?}.", delta_time);
     }
 
-    fn ray_color(&self, ray: &Ray) -> Vec3 {
+    fn ray_color(&self, ray: &Ray, depth: u32) -> Vec3 {
+        // Exceeded bounce limit, so no more light is gathered.
+        if depth <= 0 {
+            return Vec3::zero();
+        }
+
         let mut hit_rec = HitRecord::new();
         if self.hit_objects(ray, 0.0, f32::MAX, &mut hit_rec) {
-            return 0.5 * (hit_rec.n + Vec3::new(1.0, 1.0, 1.0))
+            let target = hit_rec.p + hit_rec.n + random_on_sphere();
+            return 0.5 * self.ray_color(
+                &Ray::new(hit_rec.p, target - hit_rec.p),
+                depth - 1
+            )
+            // return 0.5 * (hit_rec.n + Vec3::new(1.0, 1.0, 1.0))
         }
 
         let direction = ray.direction.normalized();
@@ -183,8 +196,6 @@ impl RSRaytracer {
             for y in 0..HEIGHT {
                 for x in 0..WIDTH {
                     let offset = (y * pitch + x * CHANNELS) as usize;
-
-                    // TODO: Proper mapping rather than just a clamp.
 
                     let r = self.pixels[offset + 0] * scale;
                     let r = (256.0 * r.clamp(0.0, 0.999)) as u8;
