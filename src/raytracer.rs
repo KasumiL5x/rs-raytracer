@@ -3,6 +3,8 @@ use std::io::prelude::*;
 use std::io::BufWriter;
 use std::fs::File;
 
+use rand::prelude::*;
+
 use crate::math::*;
 
 // --------------------------------------------------
@@ -11,6 +13,7 @@ use crate::math::*;
 pub const WIDTH: u32 = 1280;
 pub const HEIGHT: u32 = 720;
 pub const CHANNELS: u32 = 3;
+const SAMPLES_PER_PIXEL: u32 = 20;
 
 pub const PPM_OUT: &str = "./out.ppm";
 
@@ -29,8 +32,11 @@ impl RSRaytracer {
             for x in 0..WIDTH {
                 let pitch = WIDTH * CHANNELS;
                 let offset = (y * pitch + x * CHANNELS) as usize;
-                pixels[offset + 0] = (x as f32) / (WIDTH as f32);
-                pixels[offset + 1] = (y as f32) / (HEIGHT as f32);
+
+                let scale: f32 = SAMPLES_PER_PIXEL as f32;
+
+                pixels[offset + 0] = ((x as f32) / (WIDTH as f32)) * scale;
+                pixels[offset + 1] = ((y as f32) / (HEIGHT as f32)) * scale;
                 pixels[offset + 2] = 0.0;
             }
         }
@@ -79,24 +85,23 @@ impl RSRaytracer {
         }
 
         // Manual copy per pixel.
+        let scale = 1.0 / (SAMPLES_PER_PIXEL as f32);
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             for y in 0..HEIGHT {
                 for x in 0..WIDTH {
                     let offset = (y * (pitch as u32) + x * CHANNELS) as usize;
 
-                    // TODO: Proper mapping rather than just a clamp.
+                    let r_pixel = self.pixels[offset + 0] * scale;
+                    let r_value = (256.0 * r_pixel.clamp(0.0, 0.999)) as u8;
+                    buffer[offset + 0] = r_value;
 
-                    let r_pixel = self.pixels[offset + 0];
-                    let r_value = (r_pixel * 255.0) as u8;
-                    buffer[offset + 0] = if r_value > u8::MAX {u8::MAX} else {r_value};
+                    let g_pixel = self.pixels[offset + 1] * scale;
+                    let g_value = (256.0 * g_pixel.clamp(0.0, 0.999)) as u8;
+                    buffer[offset + 1] = g_value;
 
-                    let g_pixel = self.pixels[offset + 1];
-                    let g_value = (g_pixel * 255.0) as u8;
-                    buffer[offset + 1] = if g_value > u8::MAX {u8::MAX} else {g_value};
-
-                    let b_pixel = self.pixels[offset + 2];
-                    let b_value = (b_pixel * 255.0) as u8;
-                    buffer[offset + 2] = if b_value > u8::MAX {u8::MAX} else {b_value};
+                    let b_pixel = self.pixels[offset + 2] * scale;
+                    let b_value = (256.0 * b_pixel.clamp(0.0, 0.999)) as u8;
+                    buffer[offset + 2] = b_value;
                 }
             }
         }).unwrap();
@@ -113,20 +118,34 @@ impl RSRaytracer {
         println!("Starting ray tracer...");
         let start_time = std::time::Instant::now();
 
+        // Much, much more efficient than thread_rng.
+        let mut rng = SmallRng::from_entropy();
+
         let pitch = WIDTH * CHANNELS;
         for y in 0..HEIGHT {
             print!("Rendering line {}/{}...", y+1, HEIGHT);
             for x in 0..WIDTH {
                 let offset = (y * pitch + x * CHANNELS) as usize;
 
-                let u = (x as f32) / ((WIDTH-1) as f32);
-                let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
-                let r = self.cam.get_ray(u, v);
-                let col = self.ray_color(&r);
+                let mut pixel_color = Vec3::zero();
+                for _i in 0..SAMPLES_PER_PIXEL {
+                    let r0: f32 = rng.gen();
+                    let u = ((x as f32) + r0) / ((WIDTH-1) as f32);
 
-                self.pixels[offset + 0] = col.x;
-                self.pixels[offset + 1] = col.y;
-                self.pixels[offset + 2] = col.z;
+                    let r1: f32 = rng.gen();
+                    let v = ((y as f32) + r1) / ((HEIGHT-1) as f32);
+
+                    let r = self.cam.get_ray(u, 1.0 - v);
+                    pixel_color += self.ray_color(&r);
+                }
+                // let u = (x as f32) / ((WIDTH-1) as f32);
+                // let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
+                // let r = self.cam.get_ray(u, v);
+                // let pixel_color = self.ray_color(&r);
+
+                self.pixels[offset + 0] = pixel_color.x;
+                self.pixels[offset + 1] = pixel_color.y;
+                self.pixels[offset + 2] = pixel_color.z;
             }
             println!("done!");
         }
@@ -159,6 +178,7 @@ impl RSRaytracer {
             write!(writer, "P3\n{} {}\n255\n", WIDTH, HEIGHT)?;
 
             // Pixels (in rows, left to right, top to bottom).
+            let scale = 1.0 / (SAMPLES_PER_PIXEL as f32);
             let pitch = WIDTH * CHANNELS;
             for y in 0..HEIGHT {
                 for x in 0..WIDTH {
@@ -166,9 +186,14 @@ impl RSRaytracer {
 
                     // TODO: Proper mapping rather than just a clamp.
 
-                    let r = (self.pixels[offset + 0] * 255.0) as u8;
-                    let g = (self.pixels[offset + 1] * 255.0) as u8;
-                    let b = (self.pixels[offset + 2] * 255.0) as u8;
+                    let r = self.pixels[offset + 0] * scale;
+                    let r = (256.0 * r.clamp(0.0, 0.999)) as u8;
+
+                    let g = self.pixels[offset + 1] * scale;
+                    let g = (256.0 * g.clamp(0.0, 0.999)) as u8;
+
+                    let b = self.pixels[offset + 2] * scale;
+                    let b = (256.0* b.clamp(0.0, 0.999)) as u8;
 
                     write!(writer, "{} {} {}\n", r, g, b)?;
                 }

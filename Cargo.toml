@@ -7,10 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8.4"
 
 [dependencies.sdl2]
 version = "0.34.5"
 default-features = true
 # Includes a full SDL build including necessary libs and DLLs on the machine.
 features = ["bundled"]
+
+[dependencies.rand]
+version = "0.8.4"
+default-features = true
+features = ["small_rng"]
