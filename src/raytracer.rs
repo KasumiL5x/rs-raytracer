@@ -5,6 +5,9 @@ use std::fs::File;
 
 use crate::math::*;
 
+// --------------------------------------------------
+// RSRaytracer
+// --------------------------------------------------
 pub const WIDTH: u32 = 1280;
 pub const HEIGHT: u32 = 720;
 pub const CHANNELS: u32 = 3;
@@ -13,7 +16,8 @@ pub const PPM_OUT: &str = "./out.ppm";
 
 pub struct RSRaytracer {
     pixels: Box<[f32]>,
-    objects: Vec<Box<dyn Hittable>>
+    objects: Vec<Box<dyn Hittable>>,
+    cam: Camera
 }
 
 impl RSRaytracer {
@@ -36,8 +40,13 @@ impl RSRaytracer {
 
         RSRaytracer {
             pixels: pixels.into_boxed_slice(),
-            objects: empty_objects
+            objects: empty_objects,
+            cam: Camera::new()
         }
+    }
+
+    pub fn get_camera(&mut self) -> &mut Camera {
+        &mut self.cam
     }
 
     pub fn add_sphere(&mut self, sphere: Sphere) {
@@ -104,18 +113,6 @@ impl RSRaytracer {
         println!("Starting ray tracer...");
         let start_time = std::time::Instant::now();
 
-        // Image details.
-        let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
-        // Camera details.
-        let viewport_height = 2.0; // Why 2?
-        let viewport_width = aspect_ratio * viewport_height;
-        let focal_length = 1.0;
-        //
-        let origin = Vec3::new(0.0, 0.0, 0.0);
-        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::new(0.0, viewport_height, 0.0);
-        let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - Vec3::new(0.0, 0.0, focal_length);
-
         let pitch = WIDTH * CHANNELS;
         for y in 0..HEIGHT {
             print!("Rendering line {}/{}...", y+1, HEIGHT);
@@ -124,7 +121,7 @@ impl RSRaytracer {
 
                 let u = (x as f32) / ((WIDTH-1) as f32);
                 let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
-                let r = Ray::new(origin, lower_left_corner + u*horizontal + v*vertical - origin);
+                let r = self.cam.get_ray(u, v);
                 let col = self.ray_color(&r);
 
                 self.pixels[offset + 0] = col.x;
@@ -181,5 +178,80 @@ impl RSRaytracer {
         println!("Done!");
 
         Ok(())
+    }
+}
+
+
+// --------------------------------------------------
+// Camera
+// --------------------------------------------------
+pub struct Camera {
+    aspect_ratio: f32,
+    viewport_height: f32,
+    viewport_width: f32,
+    focal_length: f32,
+    origin: Vec3,
+    horizontal: Vec3,
+    vertical: Vec3,
+    lower_left_corner: Vec3,
+    dirty: bool
+}
+
+impl Camera {
+    pub fn new() -> Camera {
+        // Image details.
+        let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
+        // Camera details.
+        let viewport_height = 2.0; // Why 2?
+        let viewport_width = aspect_ratio * viewport_height;
+        let focal_length = 1.0;
+        //
+        let origin = Vec3::new(0.0, 0.0, 0.0);
+        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
+        let vertical = Vec3::new(0.0, viewport_height, 0.0);
+        let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - Vec3::new(0.0, 0.0, focal_length);
+
+        Camera {
+            aspect_ratio: aspect_ratio,
+            viewport_height: viewport_height,
+            viewport_width: viewport_width,
+            focal_length: focal_length,
+            origin: origin,
+            horizontal: horizontal,
+            vertical: vertical,
+            lower_left_corner: lower_left_corner,
+            dirty: true
+        }
+    }
+
+    fn update(&mut self) {
+        self.aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
+
+        self.viewport_height = 2.0; // Why 2?
+        self.viewport_width = self.aspect_ratio * self.viewport_height;
+        self.focal_length = 1.0;
+        //
+        // self.origin = Vec3::new(0.0, 0.0, 0.0);
+        self.horizontal = Vec3::new(self.viewport_width, 0.0, 0.0);
+        self.vertical = Vec3::new(0.0, self.viewport_height, 0.0);
+        self.lower_left_corner = self.origin - (self.horizontal * 0.5) - (self.vertical * 0.5) - Vec3::new(0.0, 0.0, self.focal_length);
+    }
+
+    pub fn get_position(&self) -> Vec3 {
+        self.origin
+    }
+
+    pub fn set_position(&mut self, pos: Vec3) {
+        self.origin = pos;
+        self.dirty = true;
+    }
+
+    pub fn get_ray(&mut self, u: f32, v: f32) -> Ray {
+        if self.dirty {
+            self.update();
+            self.dirty = false;
+        }
+
+        Ray::new(self.origin, self.lower_left_corner + u*self.horizontal + v*self.vertical - self.origin)
     }
 }

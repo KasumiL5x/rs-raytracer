@@ -84,14 +84,46 @@ pub fn main() -> Result<(), String> {
 
                 // Run ray tracer and update preview.
                 Event::KeyDown{keycode: Some(Keycode::Space), repeat: false, ..} => {
-                    ray_tracer.run();
-                    ray_tracer.copy_to(&mut texture);
-                    copy_texture_to_canvas(&texture, &mut canvas, window_width, window_height);
+                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
                 }
 
                 // Save ray tracer result to file.
                 Event::KeyDown{keycode: Some(Keycode::S), repeat: false, ..} => {
                     ray_tracer.save_as_ppm().expect("Failed to write PPM file.");
+                }
+
+                // Movement.
+                Event::KeyDown{keycode: Some(Keycode::Left), ..} => {
+                    let cam = ray_tracer.get_camera();
+                    let mut pos = cam.get_position();
+                    pos.x -= 0.1;
+                    cam.set_position(pos);
+
+                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
+                }
+                Event::KeyDown{keycode: Some(Keycode::Right), ..} => {
+                    let cam = ray_tracer.get_camera();
+                    let mut pos = cam.get_position();
+                    pos.x += 0.1;
+                    cam.set_position(pos);
+
+                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
+                }
+                Event::KeyDown{keycode: Some(Keycode::Up), ..} => {
+                    let cam = ray_tracer.get_camera();
+                    let mut pos = cam.get_position();
+                    pos.y += 0.1;
+                    cam.set_position(pos);
+
+                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
+                }
+                Event::KeyDown{keycode: Some(Keycode::Down), ..} => {
+                    let cam = ray_tracer.get_camera();
+                    let mut pos = cam.get_position();
+                    pos.y -= 0.1;
+                    cam.set_position(pos);
+
+                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
                 }
 
                 _ => {}
@@ -101,6 +133,12 @@ pub fn main() -> Result<(), String> {
 
 
     Ok(())
+}
+
+fn run_raytracer(rt: &mut raytracer::RSRaytracer, texture: &mut sdl2::render::Texture, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, width: u32, height: u32) {
+    rt.run();
+    rt.copy_to(texture);
+    copy_texture_to_canvas(texture, canvas, width, height);
 }
 
 fn copy_texture_to_canvas(texture: &sdl2::render::Texture, canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, width: u32, height: u32) {
