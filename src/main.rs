@@ -92,6 +92,12 @@ pub fn main() -> Result<(), String> {
                     ray_tracer.save_as_ppm().expect("Failed to write PPM file.");
                 }
 
+                // Update preview from raytracer (if window focus is lost during a ray trace, it may not update).
+                Event::KeyDown{keycode: Some(Keycode::U), repeat: false, ..} => {
+                    ray_tracer.copy_to(&mut texture);
+                    copy_texture_to_canvas(&mut texture, &mut canvas, window_width, window_height);
+                }
+
                 // Movement.
                 Event::KeyDown{keycode: Some(Keycode::Left), ..} => {
                     let cam = ray_tracer.get_camera();

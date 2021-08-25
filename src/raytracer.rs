@@ -88,22 +88,20 @@ impl RSRaytracer {
         }
 
         // Manual copy per pixel.
-        let scale = 1.0 / (SAMPLES_PER_PIXEL as f32);
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             for y in 0..HEIGHT {
                 for x in 0..WIDTH {
                     let offset = (y * (pitch as u32) + x * CHANNELS) as usize;
 
-                    let r_pixel = self.pixels[offset + 0] * scale;
-                    let r_value = (256.0 * r_pixel.clamp(0.0, 0.999)) as u8;
+                    let pixel_color = Vec3::new(
+                        self.pixels[offset + 0],
+                        self.pixels[offset + 1],
+                        self.pixels[offset + 2]
+                    );
+                    let (r_value, g_value, b_value) = self.get_final_rgb(&pixel_color);
+
                     buffer[offset + 0] = r_value;
-
-                    let g_pixel = self.pixels[offset + 1] * scale;
-                    let g_value = (256.0 * g_pixel.clamp(0.0, 0.999)) as u8;
                     buffer[offset + 1] = g_value;
-
-                    let b_pixel = self.pixels[offset + 2] * scale;
-                    let b_value = (256.0 * b_pixel.clamp(0.0, 0.999)) as u8;
                     buffer[offset + 2] = b_value;
                 }
             }
@@ -179,6 +177,23 @@ impl RSRaytracer {
         (1.0-t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
     }
 
+    fn get_final_rgb(&self, pixel_color: &Vec3) -> (u8, u8, u8) {
+        let mut out_color = pixel_color.clone();
+
+        // Divide the color by the number of samples and gamma correct for gamma=2.0.
+        let scale = 1.0 / (SAMPLES_PER_PIXEL as f32);
+        out_color.x = (out_color.x * scale).sqrt();
+        out_color.y = (out_color.y * scale).sqrt();
+        out_color.z = (out_color.z * scale).sqrt();
+
+        // Translate RGB to [0, 255] and return.
+        (
+            (256.0 * out_color.x.clamp(0.0, 0.999)) as u8,
+            (256.0 * out_color.y.clamp(0.0, 0.999)) as u8,
+            (256.0 * out_color.z.clamp(0.0, 0.999)) as u8
+        )
+    }
+
     pub fn save_as_ppm(&self) -> io::Result<()> {
         print!("Writing PPM file...");
         let f = File::create(PPM_OUT)?;
@@ -191,22 +206,19 @@ impl RSRaytracer {
             write!(writer, "P3\n{} {}\n255\n", WIDTH, HEIGHT)?;
 
             // Pixels (in rows, left to right, top to bottom).
-            let scale = 1.0 / (SAMPLES_PER_PIXEL as f32);
             let pitch = WIDTH * CHANNELS;
             for y in 0..HEIGHT {
                 for x in 0..WIDTH {
                     let offset = (y * pitch + x * CHANNELS) as usize;
 
-                    let r = self.pixels[offset + 0] * scale;
-                    let r = (256.0 * r.clamp(0.0, 0.999)) as u8;
+                    let pixel_color = Vec3::new(
+                        self.pixels[offset + 0],
+                        self.pixels[offset + 1],
+                        self.pixels[offset + 2]
+                    );
+                    let (r_value, g_value, b_value) = self.get_final_rgb(&pixel_color);
 
-                    let g = self.pixels[offset + 1] * scale;
-                    let g = (256.0 * g.clamp(0.0, 0.999)) as u8;
-
-                    let b = self.pixels[offset + 2] * scale;
-                    let b = (256.0* b.clamp(0.0, 0.999)) as u8;
-
-                    write!(writer, "{} {} {}\n", r, g, b)?;
+                    write!(writer, "{} {} {}\n", r_value, g_value, b_value)?;
                 }
             }
 
