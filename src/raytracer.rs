@@ -14,8 +14,8 @@ pub const WIDTH: u32 = 1280;
 pub const HEIGHT: u32 = 720;
 pub const CHANNELS: u32 = 3;
 
-const SAMPLES_PER_PIXEL: u32 = 20; // 100
-const MAX_DEPTH: u32 = 20; // 50
+const SAMPLES_PER_PIXEL: u32 = 100; // 100
+const MAX_DEPTH: u32 = 50; // 50
 
 
 pub const PPM_OUT: &str = "./out.ppm";
@@ -163,7 +163,7 @@ impl RSRaytracer {
         }
 
         let mut hit_rec = HitRecord::new();
-        if self.hit_objects(ray, 0.0, f32::MAX, &mut hit_rec) {
+        if self.hit_objects(ray, 0.001, f32::MAX, &mut hit_rec) {
             let target = hit_rec.p + hit_rec.n + random_on_sphere();
             return 0.5 * self.ray_color(
                 &Ray::new(hit_rec.p, target - hit_rec.p),
