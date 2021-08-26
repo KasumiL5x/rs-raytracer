@@ -14,8 +14,8 @@ pub const WIDTH: u32 = 1280;
 pub const HEIGHT: u32 = 720;
 pub const CHANNELS: u32 = 3;
 
-const SAMPLES_PER_PIXEL: u32 = 100; // 100
-const MAX_DEPTH: u32 = 50; // 50
+const SAMPLES_PER_PIXEL: u32 = 20; // 100
+const MAX_DEPTH: u32 = 20; // 50
 
 
 pub const PPM_OUT: &str = "./out.ppm";
