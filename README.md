@@ -2,6 +2,12 @@
 
 > A ray tracer implemented in Rust based on https://raytracing.github.io/books/RayTracingInOneWeekend.html.
 
+| ⚠️ WARNING   |
+|:-------------|
+| This code is still in progress, as is the README! |
+
+Created to learn Rust in a more interesting way.
+
 The ray tracer is implemented as a standalone module that can write to a file or copy to an SDL2 texture.
 An SDL window handles the display and keystrokes for running the ray tracer and saving the image.
 
