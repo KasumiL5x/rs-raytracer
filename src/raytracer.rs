@@ -164,7 +164,8 @@ impl RSRaytracer {
 
         let mut hit_rec = HitRecord::new();
         if self.hit_objects(ray, 0.001, f32::MAX, &mut hit_rec) {
-            let target = hit_rec.p + hit_rec.n + random_on_sphere();
+            // let target = hit_rec.p + hit_rec.n + random_on_sphere(); // Older version.
+            let target = hit_rec.p + hit_rec.n + random_in_hemisphere(&hit_rec.n);
             return 0.5 * self.ray_color(
                 &Ray::new(hit_rec.p, target - hit_rec.p),
                 depth - 1

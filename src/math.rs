@@ -292,3 +292,13 @@ pub fn random_on_sphere() -> Vec3 {
         rng.gen::<f32>() - 0.5
     ).normalize()
 }
+
+pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
+    let rand_on_sphere = random_on_sphere();
+    if rand_on_sphere.dot(normal) > 0.0 {
+        // In the same hemisphere as the normal.
+        return rand_on_sphere
+    } else {
+        return -rand_on_sphere
+    }
+}
