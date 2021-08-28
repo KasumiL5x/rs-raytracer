@@ -315,3 +315,178 @@ impl Camera {
         Ray::new(self.origin, self.lower_left_corner + u*self.horizontal + v*self.vertical - self.origin)
     }
 }
+
+
+// --------------------------------------------------
+// Material(s)
+// --------------------------------------------------
+// https://stackoverflow.com/questions/30353462/how-to-clone-a-struct-storing-a-boxed-trait-object
+pub trait Material: MaterialClone {
+    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool;
+}
+pub trait MaterialClone {
+    fn clone_mat(&self) -> Box<dyn Material>;
+}
+impl<T> MaterialClone for T where T: 'static + Material + Clone, {
+    fn clone_mat(&self) -> Box<dyn Material> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn Material> {
+    fn clone(&self) -> Box<dyn Material> {
+        self.clone_mat()
+    }
+}
+
+#[derive(Clone)]
+pub struct Lambertian {
+    albedo: Vec3
+}
+impl Lambertian {
+    pub fn new(albedo: Vec3) -> Lambertian {
+        Lambertian {
+            albedo: albedo
+        }
+    }
+}
+impl Material for Lambertian {
+    fn scatter(&self, _ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool {
+        let mut scatter_dir = hit_rec.n + Vec3::random_on_sphere();
+
+        // Catch degenerate scatter direction.
+        if scatter_dir.near_zero() {
+            scatter_dir = hit_rec.n;
+        }
+
+        out_scattered.origin = hit_rec.p;
+        out_scattered.direction = scatter_dir;
+
+        out_attenuation.x = self.albedo.x;
+        out_attenuation.y = self.albedo.y;
+        out_attenuation.z = self.albedo.z;
+
+        return true
+    }
+}
+
+#[derive(Clone)]
+pub struct Metal {
+    albedo: Vec3
+}
+impl Metal {
+    pub fn new(albedo: Vec3) -> Metal {
+        Metal {
+            albedo: albedo
+        }
+    }
+}
+impl Material for Metal {
+    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool {
+        let reflected = ray.direction.normalized().reflect(hit_rec.n);
+
+        out_scattered.origin = hit_rec.p;
+        out_scattered.direction = reflected;
+
+        out_attenuation.x = self.albedo.x;
+        out_attenuation.y = self.albedo.y;
+        out_attenuation.z = self.albedo.z;
+
+        return out_scattered.direction.dot(&hit_rec.n) > 0.0
+    }
+}
+
+
+// --------------------------------------------------
+// Hittable / HitRecord
+// --------------------------------------------------
+#[derive(Clone)]
+pub struct HitRecord {
+    pub p: Vec3,
+    pub n: Vec3,
+    pub t: f32,
+    pub front_face: bool,
+    pub mat: Box<dyn Material>
+}
+
+impl HitRecord {
+    pub fn new() -> HitRecord {
+        HitRecord{
+            p: Vec3::new(0.0, 0.0, 0.0),
+            n: Vec3::new(0.0, 0.0, 0.0),
+            t: 0.0,
+            front_face: false,
+            mat: Box::new(Lambertian::new(Vec3::zero())) // Dummy material. Sadly cannot be null.
+        }
+    }
+
+    pub fn new_pop(p: Vec3, n: Vec3, t: f32, front_face: bool, mat: Box<dyn Material>) -> HitRecord {
+        HitRecord {
+            p: p,
+            n: n,
+            t: t,
+            front_face: front_face,
+            mat: mat
+        }
+    }
+
+    pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: &Vec3) {
+        self.front_face = ray.direction.dot(outward_normal) < 0.0;
+        self.n = if self.front_face {*outward_normal} else {-*outward_normal};
+    }
+}
+
+pub trait Hittable {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
+}
+
+
+// --------------------------------------------------
+// Sphere
+// --------------------------------------------------
+pub struct Sphere {
+    pub center: Vec3,
+    pub radius: f32,
+    mat: Box<dyn Material>
+}
+
+impl Sphere {
+    pub fn new(center: Vec3, radius: f32, mat: Box<dyn Material>) -> Sphere {
+        Sphere {
+            center: center,
+            radius: radius,
+            mat: mat
+        }
+    }
+}
+
+impl Hittable for Sphere {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let oc = ray.origin - self.center;
+        let a = ray.direction.sqr_length();
+        let half_b = oc.dot(&ray.direction);
+        let c = oc.sqr_length() - (self.radius * self.radius);
+
+        let discriminant = (half_b * half_b) - (a * c);
+        if discriminant < 0.0 {
+            return None
+        }
+        let sqrtd = discriminant.sqrt();
+
+        // Find the nearest root that lies in the acceptable range.
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None
+            }
+        }
+
+        let mut hr = HitRecord::new_pop(
+            ray.at(root), Vec3::zero(), root, false, self.mat.clone()
+        );
+        let outward_normal = (hr.p - self.center) / self.radius;
+        hr.set_face_normal(ray, &outward_normal);
+
+        return Some(hr)
+    }
+}
