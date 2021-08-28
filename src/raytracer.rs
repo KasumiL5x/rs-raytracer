@@ -63,20 +63,22 @@ impl RSRaytracer {
         self.objects.push(boxed_obj)
     }
 
-    fn hit_objects(&self, ray: &Ray, t_min: f32, t_max: f32, out_hit: &mut HitRecord) -> bool {
-        let mut tmp_rec: HitRecord = HitRecord::new();
+    fn hit_objects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let mut best_rec: HitRecord = HitRecord::new();
         let mut hit_anything = false;
         let mut closest_so_far = t_max;
 
         for obj in self.objects.as_slice() {
-            if obj.hit(ray, t_min, closest_so_far, &mut tmp_rec) {
+            let tmp_rec = obj.hit(ray, t_min, closest_so_far);
+            if !tmp_rec.is_none() {
+                let tmp_rec = tmp_rec.unwrap();
                 hit_anything = true;
                 closest_so_far = tmp_rec.t;
-                *out_hit = tmp_rec;
+                best_rec = tmp_rec;
             }
         }
 
-        return hit_anything
+        return if hit_anything {Some(best_rec)} else {None}
     }
 
     pub fn copy_to(&self, texture: &mut sdl2::render::Texture) {
@@ -162,15 +164,24 @@ impl RSRaytracer {
             return Vec3::zero();
         }
 
-        let mut hit_rec = HitRecord::new();
-        if self.hit_objects(ray, 0.001, f32::MAX, &mut hit_rec) {
+        let hit_rec = self.hit_objects(ray, 0.001, f32::MAX);
+        if !hit_rec.is_none() {
+            let mut scattered: Ray = Ray::new(Vec3::zero(), Vec3::zero());
+            let mut attenuation: Vec3 = Vec3::zero();
+            let hit_rec = hit_rec.unwrap();
+            if hit_rec.mat.scatter(ray, &hit_rec, &mut attenuation, &mut scattered) {
+                // return attenuation * self.ray_color(&scattered, depth - 1)
+                return attenuation * self.ray_color(&scattered, depth - 1)
+            }
+
+            return Vec3::zero()
+
             // let target = hit_rec.p + hit_rec.n + random_on_sphere(); // Older version.
-            let target = hit_rec.p + hit_rec.n + random_in_hemisphere(&hit_rec.n);
-            return 0.5 * self.ray_color(
-                &Ray::new(hit_rec.p, target - hit_rec.p),
-                depth - 1
-            )
-            // return 0.5 * (hit_rec.n + Vec3::new(1.0, 1.0, 1.0))
+            // let target = hit_rec.p + hit_rec.n + random_in_hemisphere(&hit_rec.n);
+            // return 0.5 * self.ray_color(
+            //     &Ray::new(hit_rec.p, target - hit_rec.p),
+            //     depth - 1
+            // )
         }
 
         let direction = ray.direction.normalized();

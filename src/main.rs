@@ -61,12 +61,40 @@ pub fn main() -> Result<(), String> {
     let mut ray_tracer = raytracer::RSRaytracer::new();
 
     // Setup the scene.
+    let mat_ground = math::Lambertian::new(math::Vec3::new(0.8, 0.8, 0.0));
+    let mat_center = math::Lambertian::new(math::Vec3::new(0.7, 0.3, 0.3));
+    let mat_left = math::Metal::new(math::Vec3::new(0.8, 0.8, 0.8));
+    let mat_right = math::Metal::new(math::Vec3::new(0.8, 0.6, 0.2));
     ray_tracer.add_sphere(
-        math::Sphere::new(math::Vec3::new(0.0, 0.0, -1.0), 0.5)
+        math::Sphere::new(
+            math::Vec3::new(0.0, -100.5, -1.0), 100.0,
+            Box::new(mat_ground)
+        )
     );
     ray_tracer.add_sphere(
-        math::Sphere::new(math::Vec3::new(0.0, -100.5, -1.0), 100.0)
+        math::Sphere::new(
+            math::Vec3::new(0.0, 0.0, -1.0), 0.5,
+            Box::new(mat_center)
+        )
     );
+    ray_tracer.add_sphere(
+        math::Sphere::new(
+            math::Vec3::new(-1.0, 0.0, -1.0), 0.5,
+            Box::new(mat_left)
+        )
+    );
+    ray_tracer.add_sphere(
+        math::Sphere::new(
+            math::Vec3::new(1.0, 0.0, -1.0), 0.5,
+            Box::new(mat_right)
+        )
+    );
+    // ray_tracer.add_sphere(
+    //     math::Sphere::new(math::Vec3::new(0.0, 0.0, -1.0), 0.5)
+    // );
+    // ray_tracer.add_sphere(
+    //     math::Sphere::new(math::Vec3::new(0.0, -100.5, -1.0), 100.0)
+    // );
 
     // Copy the initial raytracer texture over and display it.
     ray_tracer.copy_to(&mut texture);
