@@ -63,8 +63,8 @@ pub fn main() -> Result<(), String> {
     // Setup the scene.
     let mat_ground = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(0.8, 0.8, 0.0)));
     let mat_center = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(0.7, 0.3, 0.3)));
-    let mat_left = ray_tracer.add_metal_material(raytracer::Metal::new(math::Vec3::new(0.8, 0.8, 0.8)));
-    let mat_right = ray_tracer.add_metal_material(raytracer::Metal::new(math::Vec3::new(0.8, 0.6, 0.2)));
+    let mat_left = ray_tracer.add_metal_material(raytracer::Metal::new(math::Vec3::new(0.8, 0.8, 0.8), 0.3));
+    let mat_right = ray_tracer.add_metal_material(raytracer::Metal::new(math::Vec3::new(0.8, 0.6, 0.2), 1.0));
     ray_tracer.add_sphere(
         raytracer::Sphere::new(
             math::Vec3::new(0.0, -100.5, -1.0), 100.0,
