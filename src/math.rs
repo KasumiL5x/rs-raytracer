@@ -29,6 +29,14 @@ impl Vec3 {
         }
     }
 
+    pub fn one() -> Vec3 {
+        Vec3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0
+        }
+    }
+
     pub fn random() -> Vec3 {
         let mut rng = SmallRng::from_entropy();
         Vec3 {

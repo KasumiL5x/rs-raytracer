@@ -23,6 +23,7 @@ pub const PPM_OUT: &str = "./out.ppm";
 pub struct RSRaytracer {
     pixels: Box<[f32]>,
     objects: Vec<Box<dyn Hittable>>,
+    materials: Vec<Box<dyn Material>>,
     cam: Camera
 }
 
@@ -36,6 +37,7 @@ impl RSRaytracer {
                 let pitch = WIDTH * CHANNELS;
                 let offset = (y * pitch + x * CHANNELS) as usize;
 
+                // Must be multiplied here as there's a conversion using this value when outputting the underlying data.
                 let scale: f32 = SAMPLES_PER_PIXEL as f32;
 
                 pixels[offset + 0] = ((x as f32) / (WIDTH as f32)) * scale;
@@ -44,12 +46,14 @@ impl RSRaytracer {
             }
         }
 
-        // No objects.
-        let empty_objects:  Vec<Box<dyn Hittable>> = Vec::new();
+        // Add a single default material so that default 0 indexes don't fail.
+        let mut mats: Vec<Box<dyn Material>> = Vec::new();
+        mats.push(Box::new(Lambertian::new(Vec3::one())));
 
         RSRaytracer {
             pixels: pixels.into_boxed_slice(),
-            objects: empty_objects,
+            objects: Vec::<Box<dyn Hittable>>::new(),
+            materials: mats,
             cam: Camera::new()
         }
     }
@@ -58,13 +62,29 @@ impl RSRaytracer {
         &mut self.cam
     }
 
+    pub fn add_lambertian_material(&mut self, mat: Lambertian) -> u32 {
+        let boxed_mat = Box::new(mat);
+        self.materials.push(boxed_mat);
+        return (self.materials.len() - 1) as u32
+    }
+
+    pub fn add_metal_material(&mut self, mat: Metal) -> u32 {
+        let boxed_mat = Box::new(mat);
+        self.materials.push(boxed_mat);
+        return (self.materials.len() - 1) as u32
+    }
+
+    pub fn get_material(&self, idx: u32) -> &Box<dyn Material> {
+        &self.materials[idx as usize]
+    }
+
     pub fn add_sphere(&mut self, sphere: Sphere) {
         let boxed_obj = Box::new(sphere);
         self.objects.push(boxed_obj)
     }
 
     fn hit_objects(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        let mut best_rec: HitRecord = HitRecord::new();
+        let mut best_rec: HitRecord = HitRecord::empty();
         let mut hit_anything = false;
         let mut closest_so_far = t_max;
 
@@ -141,10 +161,6 @@ impl RSRaytracer {
                     let r = self.cam.get_ray(u, 1.0 - v);
                     pixel_color += self.ray_color(&r, MAX_DEPTH);
                 }
-                // let u = (x as f32) / ((WIDTH-1) as f32);
-                // let v = 1.0 - ((y as f32) / ((HEIGHT-1) as f32));
-                // let r = self.cam.get_ray(u, v);
-                // let pixel_color = self.ray_color(&r);
 
                 self.pixels[offset + 0] = pixel_color.x;
                 self.pixels[offset + 1] = pixel_color.y;
@@ -169,24 +185,17 @@ impl RSRaytracer {
             let mut scattered: Ray = Ray::new(Vec3::zero(), Vec3::zero());
             let mut attenuation: Vec3 = Vec3::zero();
             let hit_rec = hit_rec.unwrap();
-            if hit_rec.mat.scatter(ray, &hit_rec, &mut attenuation, &mut scattered) {
-                // return attenuation * self.ray_color(&scattered, depth - 1)
+            let mat = self.get_material(hit_rec.mat_id);
+            if mat.scatter(ray, &hit_rec, &mut attenuation, &mut scattered) {
                 return attenuation * self.ray_color(&scattered, depth - 1)
             }
 
             return Vec3::zero()
-
-            // let target = hit_rec.p + hit_rec.n + random_on_sphere(); // Older version.
-            // let target = hit_rec.p + hit_rec.n + random_in_hemisphere(&hit_rec.n);
-            // return 0.5 * self.ray_color(
-            //     &Ray::new(hit_rec.p, target - hit_rec.p),
-            //     depth - 1
-            // )
         }
 
         let direction = ray.direction.normalized();
         let t = 0.5 * (direction.y + 1.0);
-        (1.0-t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
+        return (1.0-t) * Vec3::new(1.0, 1.0, 1.0) + t * Vec3::new(0.5, 0.7, 1.0)
     }
 
     fn get_final_rgb(&self, pixel_color: &Vec3) -> (u8, u8, u8) {
@@ -291,7 +300,6 @@ impl Camera {
         self.viewport_width = self.aspect_ratio * self.viewport_height;
         self.focal_length = 1.0;
         //
-        // self.origin = Vec3::new(0.0, 0.0, 0.0);
         self.horizontal = Vec3::new(self.viewport_width, 0.0, 0.0);
         self.vertical = Vec3::new(0.0, self.viewport_height, 0.0);
         self.lower_left_corner = self.origin - (self.horizontal * 0.5) - (self.vertical * 0.5) - Vec3::new(0.0, 0.0, self.focal_length);
@@ -321,24 +329,27 @@ impl Camera {
 // Material(s)
 // --------------------------------------------------
 // https://stackoverflow.com/questions/30353462/how-to-clone-a-struct-storing-a-boxed-trait-object
-pub trait Material: MaterialClone {
+// pub trait Material: MaterialClone {
+//     fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool;
+// }
+// pub trait MaterialClone {
+//     fn clone_mat(&self) -> Box<dyn Material>;
+// }
+// impl<T> MaterialClone for T where T: 'static + Material + Clone, {
+//     fn clone_mat(&self) -> Box<dyn Material> {
+//         Box::new(self.clone())
+//     }
+// }
+// impl Clone for Box<dyn Material> {
+//     fn clone(&self) -> Box<dyn Material> {
+//         self.clone_mat()
+//     }
+// }
+// NOTE: The above is no longer needed as materials are now referred to by an index. I'm keeping this around for posterity, though.
+pub trait Material {
     fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool;
 }
-pub trait MaterialClone {
-    fn clone_mat(&self) -> Box<dyn Material>;
-}
-impl<T> MaterialClone for T where T: 'static + Material + Clone, {
-    fn clone_mat(&self) -> Box<dyn Material> {
-        Box::new(self.clone())
-    }
-}
-impl Clone for Box<dyn Material> {
-    fn clone(&self) -> Box<dyn Material> {
-        self.clone_mat()
-    }
-}
 
-#[derive(Clone)]
 pub struct Lambertian {
     albedo: Vec3
 }
@@ -361,15 +372,12 @@ impl Material for Lambertian {
         out_scattered.origin = hit_rec.p;
         out_scattered.direction = scatter_dir;
 
-        out_attenuation.x = self.albedo.x;
-        out_attenuation.y = self.albedo.y;
-        out_attenuation.z = self.albedo.z;
+        *out_attenuation = self.albedo;
 
         return true
     }
 }
 
-#[derive(Clone)]
 pub struct Metal {
     albedo: Vec3
 }
@@ -387,9 +395,7 @@ impl Material for Metal {
         out_scattered.origin = hit_rec.p;
         out_scattered.direction = reflected;
 
-        out_attenuation.x = self.albedo.x;
-        out_attenuation.y = self.albedo.y;
-        out_attenuation.z = self.albedo.z;
+        *out_attenuation = self.albedo;
 
         return out_scattered.direction.dot(&hit_rec.n) > 0.0
     }
@@ -405,27 +411,27 @@ pub struct HitRecord {
     pub n: Vec3,
     pub t: f32,
     pub front_face: bool,
-    pub mat: Box<dyn Material>
+    pub mat_id: u32
 }
 
 impl HitRecord {
-    pub fn new() -> HitRecord {
+    pub fn empty() -> HitRecord {
         HitRecord{
             p: Vec3::new(0.0, 0.0, 0.0),
             n: Vec3::new(0.0, 0.0, 0.0),
             t: 0.0,
             front_face: false,
-            mat: Box::new(Lambertian::new(Vec3::zero())) // Dummy material. Sadly cannot be null.
+            mat_id: 0
         }
     }
 
-    pub fn new_pop(p: Vec3, n: Vec3, t: f32, front_face: bool, mat: Box<dyn Material>) -> HitRecord {
+    pub fn new(p: Vec3, n: Vec3, t: f32, front_face: bool, mat_id: u32) -> HitRecord {
         HitRecord {
             p: p,
             n: n,
             t: t,
             front_face: front_face,
-            mat: mat
+            mat_id: mat_id
         }
     }
 
@@ -446,15 +452,15 @@ pub trait Hittable {
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
-    mat: Box<dyn Material>
+    pub mat_id: u32
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f32, mat: Box<dyn Material>) -> Sphere {
+    pub fn new(center: Vec3, radius: f32, mat_id: u32) -> Sphere {
         Sphere {
             center: center,
             radius: radius,
-            mat: mat
+            mat_id: mat_id
         }
     }
 }
@@ -481,8 +487,8 @@ impl Hittable for Sphere {
             }
         }
 
-        let mut hr = HitRecord::new_pop(
-            ray.at(root), Vec3::zero(), root, false, self.mat.clone()
+        let mut hr = HitRecord::new(
+            ray.at(root), Vec3::zero(), root, false, self.mat_id
         );
         let outward_normal = (hr.p - self.center) / self.radius;
         hr.set_face_normal(ray, &outward_normal);
