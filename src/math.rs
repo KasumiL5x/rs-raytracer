@@ -2,6 +2,21 @@ use std::ops;
 
 use rand::prelude::*;
 
+pub struct RandGen {
+    rng: SmallRng // Much, much more efficient than thread_rng.
+}
+impl RandGen {
+    pub fn new() -> RandGen {
+        RandGen {
+            rng: SmallRng::from_entropy()
+        }
+    }
+    
+    pub fn next01(&mut self) -> f32{
+        self.rng.gen()
+    }
+}
+
 // --------------------------------------------------
 // Vec3
 // --------------------------------------------------
@@ -109,6 +124,14 @@ impl Vec3 {
             return -rand_on_sphere
         }
     }
+
+    pub fn refract(uv: Vec3, n: Vec3, eta_i_over_eta_t: f32) -> Vec3 {
+        // NOTE: Inputs aren't references as you have to re-implement all std::ops for reference types...not worth it yet.
+        let cos_theta = (-uv).dot(&n).min(1.0);
+        let r_out_perpendicular = eta_i_over_eta_t * (uv + cos_theta * n);
+        let r_out_parallel = (-(1.0 - r_out_perpendicular.sqr_length()).abs().sqrt()) * n;
+        return r_out_perpendicular + r_out_parallel
+    }
 }
 
 // Vec3 + Vec3
@@ -205,6 +228,18 @@ impl ops::Neg for Vec3 {
         }
     }
 }
+// Rust is playing a dangerous game here having separate implementations for references...
+// https://stackoverflow.com/questions/28005134/how-do-i-implement-the-add-trait-for-a-reference-to-a-struct
+// impl ops::Neg for &Vec3 {
+//     type Output = Vec3;
+//     fn neg(self) -> Vec3 {
+//         Vec3 {
+//             x: -self.x,
+//             y: -self.y,
+//             z: -self.z
+//         }
+//     }
+// }
 
 // --------------------------------------------------
 // Ray

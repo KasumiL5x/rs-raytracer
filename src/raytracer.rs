@@ -3,8 +3,6 @@ use std::io::prelude::*;
 use std::io::BufWriter;
 use std::fs::File;
 
-use rand::prelude::*;
-
 use crate::math::*;
 
 // --------------------------------------------------
@@ -24,7 +22,8 @@ pub struct RSRaytracer {
     pixels: Box<[f32]>,
     objects: Vec<Box<dyn Hittable>>,
     materials: Vec<Box<dyn Material>>,
-    cam: Camera
+    cam: Camera,
+    rand_gen: RandGen // Shared random number generator.
 }
 
 impl RSRaytracer {
@@ -54,7 +53,8 @@ impl RSRaytracer {
             pixels: pixels.into_boxed_slice(),
             objects: Vec::<Box<dyn Hittable>>::new(),
             materials: mats,
-            cam: Camera::new()
+            cam: Camera::new(),
+            rand_gen: RandGen::new()
         }
     }
 
@@ -74,8 +74,18 @@ impl RSRaytracer {
         return (self.materials.len() - 1) as u32
     }
 
+    pub fn add_dielectric_material(&mut self, mat: Dielectric) -> u32 {
+        let boxed_mat = Box::new(mat);
+        self.materials.push(boxed_mat);
+        return (self.materials.len() - 1) as u32
+    }
+
     pub fn get_material(&self, idx: u32) -> &Box<dyn Material> {
         &self.materials[idx as usize]
+    }
+
+    pub fn get_rng(&mut self) -> &mut RandGen {
+        &mut self.rand_gen
     }
 
     pub fn add_sphere(&mut self, sphere: Sphere) {
@@ -141,9 +151,6 @@ impl RSRaytracer {
         println!("Starting ray tracer...");
         let start_time = std::time::Instant::now();
 
-        // Much, much more efficient than thread_rng.
-        let mut rng = SmallRng::from_entropy();
-
         let pitch = WIDTH * CHANNELS;
         for y in 0..HEIGHT {
             print!("Rendering line {}/{}...", y+1, HEIGHT);
@@ -152,10 +159,10 @@ impl RSRaytracer {
 
                 let mut pixel_color = Vec3::zero();
                 for _i in 0..SAMPLES_PER_PIXEL {
-                    let r0: f32 = rng.gen();
+                    let r0: f32 = self.rand_gen.next01();
                     let u = ((x as f32) + r0) / ((WIDTH-1) as f32);
 
-                    let r1: f32 = rng.gen();
+                    let r1: f32 = self.rand_gen.next01();
                     let v = ((y as f32) + r1) / ((HEIGHT-1) as f32);
 
                     let r = self.cam.get_ray(u, 1.0 - v);
@@ -174,7 +181,7 @@ impl RSRaytracer {
         println!("Ray trace complete in {:?}.", delta_time);
     }
 
-    fn ray_color(&self, ray: &Ray, depth: u32) -> Vec3 {
+    fn ray_color(&mut self, ray: &Ray, depth: u32) -> Vec3 {
         // Exceeded bounce limit, so no more light is gathered.
         if depth <= 0 {
             return Vec3::zero();
@@ -185,8 +192,9 @@ impl RSRaytracer {
             let mut scattered: Ray = Ray::new(Vec3::zero(), Vec3::zero());
             let mut attenuation: Vec3 = Vec3::zero();
             let hit_rec = hit_rec.unwrap();
-            let mat = self.get_material(hit_rec.mat_id);
-            if mat.scatter(ray, &hit_rec, &mut attenuation, &mut scattered) {
+            let mut rgen = &mut self.rand_gen;
+            let mat = &mut self.materials[hit_rec.mat_id as usize];
+            if mat.scatter(ray, &hit_rec, &mut attenuation, &mut scattered, &mut rgen) {
                 return attenuation * self.ray_color(&scattered, depth - 1)
             }
 
@@ -347,7 +355,7 @@ impl Camera {
 // }
 // NOTE: The above is no longer needed as materials are now referred to by an index. I'm keeping this around for posterity, though.
 pub trait Material {
-    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool;
+    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray, rng: &mut RandGen) -> bool;
 }
 
 pub struct Lambertian {
@@ -361,7 +369,7 @@ impl Lambertian {
     }
 }
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool {
+    fn scatter(&self, _ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray, _rng: &mut RandGen) -> bool {
         let mut scatter_dir = hit_rec.n + Vec3::random_on_sphere();
 
         // Catch degenerate scatter direction.
@@ -391,7 +399,7 @@ impl Metal {
     }
 }
 impl Material for Metal {
-    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray) -> bool {
+    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray, _rng: &mut RandGen) -> bool {
         let reflected = ray.direction.normalized().reflect(hit_rec.n);
 
         out_scattered.origin = hit_rec.p;
@@ -400,6 +408,46 @@ impl Material for Metal {
         *out_attenuation = self.albedo;
 
         return out_scattered.direction.dot(&hit_rec.n) > 0.0
+    }
+}
+
+pub struct Dielectric {
+    ior: f32 // Index of refraction.
+}
+impl Dielectric {
+    pub fn new(ior: f32) -> Dielectric {
+        Dielectric {
+            ior: ior
+        }
+    }
+
+    pub fn reflectance(&self, cosine: f32, ref_idx: f32) -> f32 {
+        // Schlick's approximation.
+        let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+        r0 = r0 * r0;
+        return r0 + (1.0 - r0) * (1.0 - cosine).powf(5.0);
+    }
+}
+impl Material for Dielectric {
+    fn scatter(&self, ray: &Ray, hit_rec: &HitRecord, out_attenuation: &mut Vec3, out_scattered: &mut Ray, rng: &mut RandGen) -> bool {
+        let refract_ratio = if hit_rec.front_face {1.0 / self.ior} else {self.ior};
+        let unit_direction = ray.direction.normalized();
+
+        let cos_theta = (-unit_direction).dot(&hit_rec.n).min(1.0);
+        let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+
+        let cannot_refract = (refract_ratio * sin_theta) > 1.0;
+        
+        let direction = if cannot_refract || self.reflectance(cos_theta, refract_ratio) > rng.next01() {
+            unit_direction.reflect(hit_rec.n)
+        } else {
+            Vec3::refract(unit_direction, hit_rec.n, refract_ratio)
+        };
+
+        *out_scattered = Ray::new(hit_rec.p, direction);
+        *out_attenuation = Vec3::one();
+
+        true
     }
 }
 
