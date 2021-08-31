@@ -61,6 +61,11 @@ pub fn main() -> Result<(), String> {
     let mut ray_tracer = raytracer::RSRaytracer::new();
 
     // Setup the scene.
+    // let mat_left = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(0.0, 0.0, 1.0)));
+    // let mat_right = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(1.0, 0.0, 0.0)));
+    // let R = (3.1415926 * 0.25 as f32).cos();
+    // ray_tracer.add_sphere(raytracer::Sphere::new(math::Vec3::new(-R, 0.0, -1.0), R, mat_left));
+    // ray_tracer.add_sphere(raytracer::Sphere::new(math::Vec3::new( R, 0.0, -1.0), R, mat_right));
     let mat_ground = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(0.8, 0.8, 0.0)));
     let mat_center = ray_tracer.add_lambertian_material(raytracer::Lambertian::new(math::Vec3::new(0.1, 0.2, 0.5)));
     let mat_left = ray_tracer.add_dielectric_material(raytracer::Dielectric::new(1.5));
@@ -90,13 +95,6 @@ pub fn main() -> Result<(), String> {
         )
     );
 
-    // ray_tracer.add_sphere(
-    //     math::Sphere::new(math::Vec3::new(0.0, 0.0, -1.0), 0.5)
-    // );
-    // ray_tracer.add_sphere(
-    //     math::Sphere::new(math::Vec3::new(0.0, -100.5, -1.0), 100.0)
-    // );
-
     // Copy the initial raytracer texture over and display it.
     ray_tracer.copy_to(&mut texture);
     copy_texture_to_canvas(&texture, &mut canvas, window_width, window_height);
@@ -125,40 +123,6 @@ pub fn main() -> Result<(), String> {
                 Event::KeyDown{keycode: Some(Keycode::U), repeat: false, ..} => {
                     ray_tracer.copy_to(&mut texture);
                     copy_texture_to_canvas(&mut texture, &mut canvas, window_width, window_height);
-                }
-
-                // Movement.
-                Event::KeyDown{keycode: Some(Keycode::Left), ..} => {
-                    let cam = ray_tracer.get_camera();
-                    let mut pos = cam.get_position();
-                    pos.x -= 0.1;
-                    cam.set_position(pos);
-
-                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
-                }
-                Event::KeyDown{keycode: Some(Keycode::Right), ..} => {
-                    let cam = ray_tracer.get_camera();
-                    let mut pos = cam.get_position();
-                    pos.x += 0.1;
-                    cam.set_position(pos);
-
-                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
-                }
-                Event::KeyDown{keycode: Some(Keycode::Up), ..} => {
-                    let cam = ray_tracer.get_camera();
-                    let mut pos = cam.get_position();
-                    pos.y += 0.1;
-                    cam.set_position(pos);
-
-                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
-                }
-                Event::KeyDown{keycode: Some(Keycode::Down), ..} => {
-                    let cam = ray_tracer.get_camera();
-                    let mut pos = cam.get_position();
-                    pos.y -= 0.1;
-                    cam.set_position(pos);
-
-                    run_raytracer(&mut ray_tracer, &mut texture, &mut canvas, window_width, window_height);
                 }
 
                 _ => {}

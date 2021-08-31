@@ -49,17 +49,20 @@ impl RSRaytracer {
         let mut mats: Vec<Box<dyn Material>> = Vec::new();
         mats.push(Box::new(Lambertian::new(Vec3::one())));
 
+        // Default camera settings.
+        let look_from = Vec3::new(-2.0, 2.0, 1.0);
+        let look_at = Vec3::new(0.0, 0.0, -1.0);
+        let up = Vec3::new(0.0, 1.0, 0.0);
+        let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
+        let vertical_fov = 20.0;
+
         RSRaytracer {
             pixels: pixels.into_boxed_slice(),
             objects: Vec::<Box<dyn Hittable>>::new(),
             materials: mats,
-            cam: Camera::new(),
+            cam: Camera::new(look_from, look_at, up, vertical_fov, aspect_ratio),
             rand_gen: RandGen::new()
         }
-    }
-
-    pub fn get_camera(&mut self) -> &mut Camera {
-        &mut self.cam
     }
 
     pub fn add_lambertian_material(&mut self, mat: Lambertian) -> u32 {
@@ -263,71 +266,40 @@ impl RSRaytracer {
 // Camera
 // --------------------------------------------------
 pub struct Camera {
-    aspect_ratio: f32,
-    viewport_height: f32,
-    viewport_width: f32,
-    focal_length: f32,
     origin: Vec3,
-    horizontal: Vec3,
-    vertical: Vec3,
     lower_left_corner: Vec3,
-    dirty: bool
+    horizontal: Vec3,
+    vertical: Vec3
 }
 
 impl Camera {
-    pub fn new() -> Camera {
-        // Image details.
-        let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
-        // Camera details.
-        let viewport_height = 2.0; // Why 2?
+    pub fn new(
+        look_from: Vec3, look_at: Vec3, up: Vec3,
+        vertical_fov: f32, aspect_ratio: f32
+    ) -> Camera {
+        let theta = vertical_fov * 0.01745329; // Convert to radians.
+        let h = (theta * 0.5).tan();
+        let viewport_height = 2.0 * h;
         let viewport_width = aspect_ratio * viewport_height;
-        let focal_length = 1.0;
-        //
-        let origin = Vec3::new(0.0, 0.0, 0.0);
-        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::new(0.0, viewport_height, 0.0);
-        let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - Vec3::new(0.0, 0.0, focal_length);
+
+        let w = (look_from - look_at).normalized();
+        let u = up.cross(&w).normalized();
+        let v = w.cross(&u);
+
+        let origin = look_from;
+        let horizontal = viewport_width * u;
+        let vertical = viewport_height * v;
+        let lower_left_corner = origin - (horizontal * 0.5) - (vertical * 0.5) - w;
 
         Camera {
-            aspect_ratio: aspect_ratio,
-            viewport_height: viewport_height,
-            viewport_width: viewport_width,
-            focal_length: focal_length,
             origin: origin,
-            horizontal: horizontal,
-            vertical: vertical,
             lower_left_corner: lower_left_corner,
-            dirty: true
+            horizontal: horizontal,
+            vertical: vertical
         }
-    }
-
-    fn update(&mut self) {
-        self.aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
-
-        self.viewport_height = 2.0; // Why 2?
-        self.viewport_width = self.aspect_ratio * self.viewport_height;
-        self.focal_length = 1.0;
-        //
-        self.horizontal = Vec3::new(self.viewport_width, 0.0, 0.0);
-        self.vertical = Vec3::new(0.0, self.viewport_height, 0.0);
-        self.lower_left_corner = self.origin - (self.horizontal * 0.5) - (self.vertical * 0.5) - Vec3::new(0.0, 0.0, self.focal_length);
-    }
-
-    pub fn get_position(&self) -> Vec3 {
-        self.origin
-    }
-
-    pub fn set_position(&mut self, pos: Vec3) {
-        self.origin = pos;
-        self.dirty = true;
     }
 
     pub fn get_ray(&mut self, u: f32, v: f32) -> Ray {
-        if self.dirty {
-            self.update();
-            self.dirty = false;
-        }
-
         Ray::new(self.origin, self.lower_left_corner + u*self.horizontal + v*self.vertical - self.origin)
     }
 }
@@ -425,7 +397,7 @@ impl Dielectric {
         // Schlick's approximation.
         let mut r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
         r0 = r0 * r0;
-        return r0 + (1.0 - r0) * (1.0 - cosine).powf(5.0);
+        return r0 + (1.0 - r0) * ((1.0 - cosine).powf(5.0));
     }
 }
 impl Material for Dielectric {
