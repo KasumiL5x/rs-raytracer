@@ -1,4 +1,5 @@
 use std::ops;
+use std::ops::Range;
 
 use rand::prelude::*;
 
@@ -12,8 +13,12 @@ impl RandGen {
         }
     }
     
-    pub fn next01(&mut self) -> f32{
+    pub fn next01(&mut self) -> f32 {
         self.rng.gen()
+    }
+
+    pub fn next_range(&mut self, r: Range<f32>) -> f32 {
+        self.rng.gen_range(r)
     }
 }
 
@@ -58,6 +63,15 @@ impl Vec3 {
             x: rng.gen(),
             y: rng.gen(),
             z: rng.gen()
+        }
+    }
+
+    pub fn random_range(r: Range<f32>) -> Vec3 {
+        let mut rng = SmallRng::from_entropy();
+        Vec3 {
+            x: rng.gen_range(r.clone()),
+            y: rng.gen_range(r.clone()),
+            z: rng.gen_range(r.clone())
         }
     }
 

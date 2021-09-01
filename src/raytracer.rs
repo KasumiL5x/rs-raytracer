@@ -50,8 +50,8 @@ impl RSRaytracer {
         mats.push(Box::new(Lambertian::new(Vec3::one())));
 
         // Default camera settings.
-        let look_from = Vec3::new(-2.0, 2.0, 1.0);
-        let look_at = Vec3::new(0.0, 0.0, -1.0);
+        let look_from = Vec3::new(13.0, 2.0, 3.0); //Vec3::new(-2.0, 2.0, 1.0);
+        let look_at = Vec3::new(0.0, 0.0, 0.0); //Vec3::new(0.0, 0.0, -1.0);
         let up = Vec3::new(0.0, 1.0, 0.0);
         let aspect_ratio = (WIDTH as f32) / (HEIGHT as f32);
         let vertical_fov = 20.0;
